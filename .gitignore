@@ -1,4 +1,3 @@
-/.idea
-./load-test
-.DS_Store
-.run-tests.sh
+.idea
+load-test
+run-tests.sh
