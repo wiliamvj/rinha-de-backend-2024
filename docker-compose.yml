@@ -11,11 +11,11 @@ services:
     ports:
       - "9999:9999"
     restart: always
-#    deploy:
-#      resources:
-#        limits:
-#          cpus: '0.1'
-#          memory: '50MB'
+    deploy:
+      resources:
+        limits:
+          cpus: '0.35'
+          memory: '30MB'
     networks:
       - app-network
 
@@ -33,11 +33,11 @@ services:
       DB_PORT: 5432
     volumes:
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql
-#    deploy:
-#      resources:
-#        limits:
-#          cpus: '0.2'
-#          memory: '80MB'
+    deploy:
+      resources:
+        limits:
+          cpus: '0.2'
+          memory: '40MB'
     depends_on:
       postgres:
         condition: service_healthy
@@ -66,11 +66,11 @@ services:
       timeout: 5s
       retries: 20
       start_period: 10s
-#    deploy:
-#      resources:
-#        limits:
-#          cpus: '0.7'
-#          memory: '260MB'
+    deploy:
+      resources:
+        limits:
+          cpus: '0.75'
+          memory: '440MB'
     networks:
       - app-network
 

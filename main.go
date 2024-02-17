@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -10,6 +9,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgxpool"
 	_ "github.com/lib/pq"
 )
 
@@ -43,7 +43,7 @@ type TransactionResponse struct {
 	Balance int64 `json:"saldo"`
 }
 
-var db *sql.DB
+var db *pgxpool.Pool
 
 func main() {
 	dbHost := os.Getenv("DB_HOST")
@@ -58,18 +58,32 @@ func main() {
 
 	connectionurl := fmt.Sprintf("host=%s user=%s password=%s dbname=%s sslmode=disable", dbHost, dbUser, dbPassword, dbName)
 
-	conn, err := sql.Open("postgres", connectionurl)
+	//conn, err := sql.Open("postgres", connectionurl)
+	//if err != nil {
+	//	panic(err)
+	//}
+	//err = conn.Ping()
+	//if err != nil {
+	//	panic(err)
+	//}
+
+	pgxconn, err := pgxpool.ParseConfig(connectionurl)
 	if err != nil {
 		panic(err)
 	}
-	err = conn.Ping()
+	conn, err := pgxpool.NewWithConfig(context.Background(), pgxconn)
+	if err != nil {
+		panic(err)
+	}
+	err = conn.Ping(context.Background())
 	if err != nil {
 		panic(err)
 	}
 	defer conn.Close()
 
 	// set db configuration
-	conn.SetMaxOpenConns(15)
+	pgxConfig := conn.Config()
+	pgxConfig.MaxConns = 9
 
 	// set global db
 	db = conn
@@ -81,13 +95,7 @@ func main() {
 			jsonResponse(w, http.StatusNotFound, nil)
 			return
 		}
-		resp, err := getBankStatement(r.Context(), id)
-		if err != nil {
-			jsonResponse(w, http.StatusBadRequest, nil)
-			return
-		}
-		jsonResponse(w, http.StatusOK, resp)
-
+		getBankStatement(r.Context(), id, w)
 	})
 	http.HandleFunc("POST /clientes/{id}/transacoes", func(w http.ResponseWriter, r *http.Request) {
 		pathId := r.PathValue("id")
@@ -108,12 +116,7 @@ func main() {
 			return
 		}
 		req.ClientID = id
-		resp, err := createTransaction(r.Context(), &req)
-		if err != nil {
-			jsonResponse(w, http.StatusUnprocessableEntity, nil)
-			return
-		}
-		jsonResponse(w, http.StatusOK, resp)
+		createTransaction(r.Context(), &req, w)
 	})
 
 	port := os.Getenv("HTTP_PORT")
@@ -127,20 +130,23 @@ func main() {
 	}
 }
 
-func getBankStatement(ctx context.Context, id int) (*BankStatement, error) {
-	// get balance and limit
+func getBankStatement(ctx context.Context, id int, w http.ResponseWriter) {
+	balanceQuery := `SELECT balance, user_limit FROM clients WHERE id = $1;`
+	transactionsQuery := `SELECT amount, type, description, created_at FROM bank_transactions t WHERE client_id = $1 ORDER BY created_at DESC LIMIT 10;`
+
 	var balance, limit int64
-	row := db.QueryRowContext(ctx, `SELECT balance, user_limit FROM clients WHERE id = $1;`, id)
+	row := db.QueryRow(ctx, balanceQuery, id)
 	err := row.Scan(&balance, &limit)
 	if err != nil {
-		return nil, err
+		jsonResponse(w, http.StatusBadRequest, nil)
+		return
 	}
 
 	// get last transactions
-	query := `SELECT amount, type, description, created_at FROM bank_transactions t where client_id = $1 ORDER BY created_at DESC LIMIT 10;`
-	result, err := db.QueryContext(ctx, query, id)
+	result, err := db.Query(ctx, transactionsQuery, id)
 	if err != nil {
-		return nil, err
+		jsonResponse(w, http.StatusBadRequest, nil)
+		return
 	}
 	var transactions []LastTransactions
 
@@ -157,29 +163,29 @@ func getBankStatement(ctx context.Context, id int) (*BankStatement, error) {
 		},
 		LastTransactions: transactions,
 	}
-	return &bankStatement, nil
+	jsonResponse(w, http.StatusOK, bankStatement)
 }
 
-func createTransaction(ctx context.Context, t *TransactionDto) (*TransactionResponse, error) {
-	_, err := db.ExecContext(ctx,
+func createTransaction(ctx context.Context, t *TransactionDto, w http.ResponseWriter) {
+	_, err := db.Exec(ctx,
 		"INSERT INTO bank_transactions(type, description, amount, client_id) VALUES ($1, $2, $3, $4)",
 		t.Type, t.Description, t.Value, t.ClientID)
 	if err != nil {
-		return nil, err
+		jsonResponse(w, http.StatusUnprocessableEntity, nil)
+		return
 	}
-
 	var newBalance, limit int64
-	err = db.QueryRowContext(ctx,
+	err = db.QueryRow(ctx,
 		"SELECT balance, user_limit FROM clients WHERE id = $1", t.ClientID).Scan(&newBalance, &limit)
 	if err != nil {
-		return nil, err
+		jsonResponse(w, http.StatusUnprocessableEntity, nil)
+		return
 	}
-
 	transaction := TransactionResponse{
 		Balance: newBalance,
 		Limit:   limit,
 	}
-	return &transaction, nil
+	jsonResponse(w, http.StatusOK, transaction)
 }
 
 func jsonResponse(w http.ResponseWriter, status int, data interface{}) {
