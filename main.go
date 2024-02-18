@@ -58,15 +58,6 @@ func main() {
 
 	connectionurl := fmt.Sprintf("host=%s user=%s password=%s dbname=%s sslmode=disable", dbHost, dbUser, dbPassword, dbName)
 
-	//conn, err := sql.Open("postgres", connectionurl)
-	//if err != nil {
-	//	panic(err)
-	//}
-	//err = conn.Ping()
-	//if err != nil {
-	//	panic(err)
-	//}
-
 	pgxconn, err := pgxpool.ParseConfig(connectionurl)
 	if err != nil {
 		panic(err)
