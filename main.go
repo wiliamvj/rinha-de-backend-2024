@@ -51,10 +51,10 @@ func main() {
 	dbPassword := os.Getenv("DB_PASSWORD")
 	dbName := os.Getenv("DB_NAME")
 
-	//dbHost := "localhost"
-	//dbUser := "rinha_user"
-	//dbPassword := "rinha_pass"
-	//dbName := "rinha_db"
+	// dbHost := "localhost"
+	// dbUser := "rinha_user"
+	// dbPassword := "rinha_pass"
+	// dbName := "rinha_db"
 
 	connectionurl := fmt.Sprintf("host=%s user=%s password=%s dbname=%s sslmode=disable", dbHost, dbUser, dbPassword, dbName)
 
@@ -122,8 +122,8 @@ func main() {
 }
 
 func getBankStatement(ctx context.Context, id int, w http.ResponseWriter) {
-	balanceQuery := `SELECT balance, user_limit FROM clients WHERE id = $1;`
-	transactionsQuery := `SELECT amount, type, description, created_at FROM bank_transactions t WHERE client_id = $1 ORDER BY created_at DESC LIMIT 10;`
+	balanceQuery := `SELECT balance, u_limit FROM client WHERE id = $1;`
+	transactionsQuery := `SELECT value, type, description, created_at FROM bank_transaction t WHERE client_id = $1 ORDER BY created_at DESC LIMIT 10;`
 
 	var balance, limit int64
 	row := db.QueryRow(ctx, balanceQuery, id)
@@ -158,23 +158,16 @@ func getBankStatement(ctx context.Context, id int, w http.ResponseWriter) {
 }
 
 func createTransaction(ctx context.Context, t *TransactionDto, w http.ResponseWriter) {
-	_, err := db.Exec(ctx,
-		"INSERT INTO bank_transactions(type, description, amount, client_id) VALUES ($1, $2, $3, $4)",
-		t.Type, t.Description, t.Value, t.ClientID)
-	if err != nil {
-		jsonResponse(w, http.StatusUnprocessableEntity, nil)
-		return
-	}
-	var newBalance, limit int64
-	err = db.QueryRow(ctx,
-		"SELECT balance, user_limit FROM clients WHERE id = $1", t.ClientID).Scan(&newBalance, &limit)
+	var result, newBalance, limit int
+	err := db.QueryRow(ctx, "SELECT * FROM new_transaction($1, $2, $3, $4)", t.ClientID, t.Value, t.Description, t.Type).Scan(&result, &newBalance, &limit)
+	fmt.Println(err)
 	if err != nil {
 		jsonResponse(w, http.StatusUnprocessableEntity, nil)
 		return
 	}
 	transaction := TransactionResponse{
-		Balance: newBalance,
-		Limit:   limit,
+		Balance: int64(newBalance),
+		Limit:   int64(limit),
 	}
 	jsonResponse(w, http.StatusOK, transaction)
 }

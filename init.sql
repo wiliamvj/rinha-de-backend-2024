@@ -1,44 +1,68 @@
-CREATE TABLE IF NOT EXISTS clients (
-    id SERIAL PRIMARY KEY NOT NULL,
-    name VARCHAR(50) NOT NULL,
-    user_limit INTEGER NOT NULL,
-    balance INTEGER NOT NULL
+SET statement_timeout = 0;
+SET lock_timeout = 0;
+SET idle_in_transaction_session_timeout = 0;
+SET client_encoding = 'UTF8';
+SET standard_conforming_strings = on;
+SET check_function_bodies = false;
+SET xmloption = content;
+SET client_min_messages = warning;
+SET row_security = off;
+SET default_tablespace = '';
+SET default_table_access_method = heap;
+
+CREATE UNLOGGED TABLE client (
+    id integer PRIMARY KEY NOT NULL,
+    balance integer NOT NULL,
+    u_limit integer NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS bank_transactions (
-    id SERIAL PRIMARY KEY NOT NULL,
-    type CHAR(1) NOT NULL,
-    description VARCHAR(10) NOT NULL,
-    amount INTEGER NOT NULL,
-    client_id INTEGER NOT NULL,
-    created_at TIMESTAMP NOT NULL DEFAULT NOW()
+CREATE UNLOGGED TABLE bank_transaction (
+    id SERIAL PRIMARY KEY,
+    value integer NOT NULL,
+    description varchar(10) NOT NULL,
+    created_at timestamp with time zone NOT NULL,
+    client_id integer NOT NULL,
+    type char(1) NOT NULL
 );
 
-CREATE INDEX IF NOT EXISTS idx_client_id ON bank_transactions (client_id);
-CREATE INDEX IF NOT EXISTS idx_clients_client_id ON clients (id);
+CREATE INDEX IF NOT EXISTS idx_client_id ON bank_transaction (client_id);
+CREATE INDEX IF NOT EXISTS idx_clients_client_id ON client (id);
+CREATE INDEX IF NOT EXISTS idx_created_at ON bank_transaction (created_at DESC);
 
-INSERT INTO clients (name, user_limit, balance)
-VALUES
-    ('David Gilmour', 100000, 0),
-    ('Steve Vai', 80000, 0),
-    ('Chimbinha', 1000000, 0),
-    ('Van Halen', 10000000, 0),
-    ('Angus Young', 500000, 0);
+INSERT INTO client (id, balance, u_limit) VALUES (1, 0, 100000);
+INSERT INTO client (id, balance, u_limit) VALUES (2, 0, 80000);
+INSERT INTO client (id, balance, u_limit) VALUES (3, 0, 1000000);
+INSERT INTO client (id, balance, u_limit) VALUES (4, 0, 10000000);
+INSERT INTO client (id, balance, u_limit) VALUES (5, 0, 500000);
 
-CREATE OR REPLACE FUNCTION update_balance()
-RETURNS TRIGGER AS $$
+DROP TYPE IF EXISTS create_transaction_result;
+CREATE TYPE create_transaction_result AS ( result integer, balance integer, u_limit integer );
+
+CREATE OR REPLACE FUNCTION new_transaction(
+    IN client_id integer,
+    IN value integer,
+    IN description varchar(10),
+    IN type char(1)
+) RETURNS create_transaction_result AS $$
+DECLARE
+    clientfound client%rowtype;
+    search RECORD;
+    ret create_transaction_result;
 BEGIN
-    UPDATE clients
-    SET balance = CASE
-     WHEN NEW.type = 'd' THEN balance - NEW.amount
-        ELSE clients.balance + NEW.amount
-    END
-    WHERE id = NEW.client_id
-      AND (NEW.type <> 'd' OR (balance - NEW.amount) >= -user_limit);
-    RETURN NEW;
+    SELECT * FROM client INTO clientfound WHERE id = client_id;
+    UPDATE client 
+        SET balance = CASE 
+        WHEN type = 'd' THEN balance - value
+            ELSE client.balance + value END 
+                WHERE id = client_id AND (type <> 'd' OR (balance - value) >= -u_limit) 
+    RETURNING balance, u_limit INTO search;
+    IF search.u_limit is NULL THEN
+        RAISE EXCEPTION 'limit exceeded';
+    ELSE
+        INSERT INTO bank_transaction (value, description, created_at, client_id, type) 
+        VALUES (value, description, now() at time zone 'utc', client_id, type);
+        SELECT 0, search.balance, search.u_limit INTO ret;
+    END IF;
+    RETURN RET;
 END;
 $$ LANGUAGE plpgsql;
-CREATE TRIGGER update_balance_trigger
-    AFTER INSERT ON bank_transactions
-    FOR EACH ROW
-EXECUTE FUNCTION update_balance();
