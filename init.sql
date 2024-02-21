@@ -36,7 +36,7 @@ INSERT INTO client (id, balance, u_limit) VALUES (4, 0, 10000000);
 INSERT INTO client (id, balance, u_limit) VALUES (5, 0, 500000);
 
 DROP TYPE IF EXISTS create_transaction_result;
-CREATE TYPE create_transaction_result AS ( result integer, balance integer, u_limit integer );
+CREATE TYPE create_transaction_result AS ( balance integer, u_limit integer );
 
 CREATE OR REPLACE FUNCTION new_transaction(
     IN client_id integer,
@@ -61,7 +61,7 @@ BEGIN
     ELSE
         INSERT INTO bank_transaction (value, description, created_at, client_id, type) 
         VALUES (value, description, now() at time zone 'utc', client_id, type);
-        SELECT 0, search.balance, search.u_limit INTO ret;
+        SELECT search.balance, search.u_limit INTO ret;
     END IF;
     RETURN RET;
 END;

@@ -74,7 +74,7 @@ func main() {
 
 	// set db configuration
 	pgxConfig := conn.Config()
-	pgxConfig.MaxConns = 9
+	pgxConfig.MaxConns = 10
 
 	// set global db
 	db = conn
@@ -114,7 +114,7 @@ func main() {
 	if port == "" {
 		port = "8080"
 	}
-	fmt.Println(fmt.Sprintf("Server is running on port :%s", port))
+	fmt.Printf("Server is running on port :%s", port)
 	err = http.ListenAndServe(fmt.Sprintf(":%s", port), nil)
 	if err != nil {
 		panic(err)
@@ -158,9 +158,8 @@ func getBankStatement(ctx context.Context, id int, w http.ResponseWriter) {
 }
 
 func createTransaction(ctx context.Context, t *TransactionDto, w http.ResponseWriter) {
-	var result, newBalance, limit int
-	err := db.QueryRow(ctx, "SELECT * FROM new_transaction($1, $2, $3, $4)", t.ClientID, t.Value, t.Description, t.Type).Scan(&result, &newBalance, &limit)
-	fmt.Println(err)
+	var newBalance, limit int
+	err := db.QueryRow(ctx, "SELECT * FROM new_transaction($1, $2, $3, $4)", t.ClientID, t.Value, t.Description, t.Type).Scan(&newBalance, &limit)
 	if err != nil {
 		jsonResponse(w, http.StatusUnprocessableEntity, nil)
 		return
