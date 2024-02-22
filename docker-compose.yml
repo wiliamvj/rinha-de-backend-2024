@@ -32,7 +32,7 @@ services:
       DB_NAME: rinha_db
       DB_PORT: 5432
     volumes:
-      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./sql/init.sql:/docker-entrypoint-initdb.d/init.sql
     # deploy:
     #   resources:
     #     limits:
@@ -58,8 +58,8 @@ services:
     ports:
       - '5432:5432'
     volumes:
-      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
-    command: 'postgres -c max_connections=1000 -c shared_buffers=128MB -c synchronous_commit=off -c fsync=off -c full_page_writes=off'
+      - ./sql/init.sql:/docker-entrypoint-initdb.d/init.sql
+    command: 'postgres -c max_connections=1000 -c fsync=off -c shared_buffers=128MB -c synchronous_commit=off -c full_page_writes=off -c full_page_writes=off'
     healthcheck:
       test: ['CMD-SHELL', "sh -c 'pg_isready -U rinha_user -d rinha_db'"]
       interval: 5s
