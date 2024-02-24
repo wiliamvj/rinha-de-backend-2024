@@ -12,27 +12,30 @@ import (
 )
 
 func GetBankStatement(ctx context.Context, id int, w http.ResponseWriter, db *pgxpool.Pool) {
-  balanceQuery := `SELECT balance, u_limit FROM client WHERE id = $1;`
-  transactionsQuery := `SELECT value, type, description, created_at FROM bank_transaction t WHERE client_id = $1 ORDER BY created_at DESC LIMIT 10;`
+  query := `
+    select c.balance, c.u_limit,t.value, t.type, t.description, t.created_at
+    from client c
+    left join (
+      select * from bank_transaction
+      where client_id = $1
+      order by created_at desc
+      limit 10
+    ) t on c.id = client_id
+    where c.id = $1;
+  `
 
   var balance, limit int64
-  row := db.QueryRow(ctx, balanceQuery, id)
-  err := row.Scan(&balance, &limit)
-  if err != nil {
-    response.JsonResponse(w, http.StatusBadRequest, nil)
-    return
-  }
-
-  result, err := db.Query(ctx, transactionsQuery, id)
-  if err != nil {
-    response.JsonResponse(w, http.StatusBadRequest, nil)
-    return
-  }
   var transactions []entity.LastTransactions
+
+  result, err := db.Query(ctx, query, id)
+  if err != nil {
+    response.JsonResponse(w, http.StatusBadRequest, nil)
+    return
+  }
 
   for result.Next() {
     t := entity.LastTransactions{}
-    _ = result.Scan(&t.Value, &t.Type, &t.Description, &t.CreatedAt)
+    _ = result.Scan(&balance, &limit, &t.Value, &t.Type, &t.Description, &t.CreatedAt)
     transactions = append(transactions, t)
   }
   bankStatement := entity.BankStatement{
@@ -46,7 +49,7 @@ func GetBankStatement(ctx context.Context, id int, w http.ResponseWriter, db *pg
   response.JsonResponse(w, http.StatusOK, bankStatement)
 }
 
-func CreateTransaction(ctx context.Context, t *dto.TransactionDto, w http.ResponseWriter, db *pgxpool.Pool) {
+func CreateTransaction(ctx context.Context, t dto.TransactionDto, w http.ResponseWriter, db *pgxpool.Pool) {
   var newBalance, limit int
   err := db.QueryRow(ctx, "SELECT * FROM new_transaction($1, $2, $3, $4)", t.ClientID, t.Value, t.Description, t.Type).Scan(&newBalance, &limit)
   if err != nil {

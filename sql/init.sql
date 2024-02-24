@@ -22,19 +22,12 @@ CREATE UNLOGGED TABLE bank_transaction (
     description varchar(10) NOT NULL,
     created_at timestamp with time zone NOT NULL,
     client_id integer NOT NULL,
-    type char(1) NOT NULL
+    type char(1) NOT NULL,
+    FOREIGN KEY (client_id) REFERENCES client (id)
 );
 
-CREATE INDEX IF NOT EXISTS idx_client_id ON bank_transaction (client_id);
 CREATE INDEX IF NOT EXISTS idx_clients_client_id ON client (id);
 CREATE INDEX IF NOT EXISTS idx_created_at ON bank_transaction (created_at DESC);
-
--- pre warm
-CREATE EXTENSION pg_prewarm;
-SELECT pg_prewarm('client');
-SELECT pg_prewarm('idx_client_id');
-SELECT pg_prewarm('bank_transaction');
-SELECT pg_prewarm('idx_created_at');
 
 INSERT INTO client (id, balance, u_limit) VALUES (1, 0, 100000);
 INSERT INTO client (id, balance, u_limit) VALUES (2, 0, 80000);
@@ -52,24 +45,23 @@ CREATE OR REPLACE FUNCTION new_transaction(
     IN type char(1)
 ) RETURNS create_transaction_result AS $$
 DECLARE
-    clientfound client%rowtype;
-    search RECORD;
     ret create_transaction_result;
 BEGIN
-    SELECT * FROM client INTO clientfound WHERE id = client_id;
     UPDATE client 
-        SET balance = CASE 
+    SET balance = CASE 
         WHEN type = 'd' THEN balance - value
-            ELSE client.balance + value END 
-                WHERE id = client_id AND (type <> 'd' OR (balance - value) >= -u_limit) 
-    RETURNING balance, u_limit INTO search;
-    IF search.u_limit is NULL THEN
-        RAISE EXCEPTION 'limit exceeded';
+        ELSE balance + value
+    END 
+    WHERE id = client_id AND (type <> 'd' OR (balance - value) >= -u_limit) 
+    RETURNING balance, u_limit INTO ret;
+
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'Cliente não encontrado ou limite excedido';
     ELSE
         INSERT INTO bank_transaction (value, description, created_at, client_id, type) 
-        VALUES (value, description, now() at time zone 'utc', client_id, type);
-        SELECT search.balance, search.u_limit INTO ret;
+        VALUES (value, description, now() AT TIME ZONE 'utc', client_id, type);
     END IF;
-    RETURN RET;
+
+    RETURN ret;
 END;
 $$ LANGUAGE plpgsql;

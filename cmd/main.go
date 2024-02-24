@@ -46,7 +46,7 @@ func main() {
 
 	// set db configuration
 	pgxConfig := conn.Config()
-	pgxConfig.MaxConns = 5
+	pgxConfig.MaxConns = 10
 
 	// set global db
 	db = conn
@@ -79,7 +79,7 @@ func main() {
 			return
 		}
 		req.ClientID = id
-		service.CreateTransaction(r.Context(), &req, w, db)
+		service.CreateTransaction(r.Context(), req, w, db)
 	})
 
 	port := os.Getenv("HTTP_PORT")
