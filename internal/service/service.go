@@ -51,7 +51,7 @@ func GetBankStatement(ctx context.Context, id int, w http.ResponseWriter, db *pg
 
 func CreateTransaction(ctx context.Context, t dto.TransactionDto, w http.ResponseWriter, db *pgxpool.Pool) {
   var newBalance, limit int
-  err := db.QueryRow(ctx, "SELECT * FROM new_transaction($1, $2, $3, $4)", t.ClientID, t.Value, t.Description, t.Type).Scan(&newBalance, &limit)
+  err := db.QueryRow(ctx, "select * from new_transaction($1, $2, $3, $4)", t.ClientID, t.Value, t.Description, t.Type).Scan(&newBalance, &limit)
   if err != nil {
     response.JsonResponse(w, http.StatusUnprocessableEntity, nil)
     return

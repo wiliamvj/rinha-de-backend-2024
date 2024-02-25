@@ -7,8 +7,6 @@ SET client_encoding = 'UTF8';
 SET check_function_bodies = false;
 SET client_min_messages = warning;
 SET row_security = off;
-SET synchronous_commit = off;
-SET commit_delay = 10000;
 
 CREATE UNLOGGED TABLE client (
     id integer PRIMARY KEY NOT NULL,
@@ -45,7 +43,7 @@ CREATE OR REPLACE FUNCTION new_transaction(
     IN type char(1)
 ) RETURNS create_transaction_result AS $$
 DECLARE
-    ret create_transaction_result;
+    tr create_transaction_result;
 BEGIN
     UPDATE client 
     SET balance = CASE 
@@ -53,15 +51,15 @@ BEGIN
         ELSE balance + value
     END 
     WHERE id = client_id AND (type <> 'd' OR (balance - value) >= -u_limit) 
-    RETURNING balance, u_limit INTO ret;
+    RETURNING balance, u_limit INTO tr;
 
     IF NOT FOUND THEN
-        RAISE EXCEPTION 'Cliente não encontrado ou limite excedido';
+        RETURN NULL;
     ELSE
         INSERT INTO bank_transaction (value, description, created_at, client_id, type) 
         VALUES (value, description, now() AT TIME ZONE 'utc', client_id, type);
     END IF;
 
-    RETURN ret;
+    RETURN tr;
 END;
 $$ LANGUAGE plpgsql;

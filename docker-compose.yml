@@ -1,88 +1,3 @@
-version: '3.9'
-
-services:
-  nginx:
-    image: nginx:alpine
-    volumes:
-      - ./nginx.conf:/etc/nginx/nginx.conf:ro
-    depends_on:
-      - api1
-      - api2
-    expose:
-      - 9999
-    network_mode: host
-    restart: always
-    deploy:
-      resources:
-        limits:
-          cpus: '0.4'
-          memory: '80MB'
-
-  api1: &api
-    build:
-      context: .
-      dockerfile: Dockerfile
-    hostname: api1
-    restart: always
-    environment:
-      DB_HOST: localhost
-      DB_PASSWORD: rinha_pass
-      DB_USER: rinha_user
-      DB_NAME: rinha_db
-      DB_PORT: 5432
-      HTTP_PORT: 8080
-    network_mode: host
-    volumes:
-      - ./sql/init.sql:/docker-entrypoint-initdb.d/init.sql
-    deploy:
-      resources:
-        limits:
-          cpus: '0.4'
-          memory: '140MB'
-    depends_on:
-      postgres:
-        condition: service_healthy
-    expose:
-      - 8080
-
-  api2:
-    <<: *api
-    hostname: api2
-    environment:
-      DB_HOST: localhost
-      DB_PASSWORD: rinha_pass
-      DB_USER: rinha_user
-      DB_NAME: rinha_db
-      DB_PORT: 5432
-      HTTP_PORT: 8081
-    expose:
-      - 8081
-
-  postgres:
-    image: postgres:alpine
-    hostname: postgres
-    environment:
-      POSTGRES_PASSWORD: rinha_pass
-      POSTGRES_USER: rinha_user
-      POSTGRES_DB: rinha_db
-    network_mode: host
-    expose:
-      - 5432
-    volumes:
-      - ./sql/init.sql:/docker-entrypoint-initdb.d/init.sql
-    command: 'postgres -c shared_buffers=96MB -c checkpoint_timeout=600 -c synchronous_commit=off -c fsync=off -c full_page_writes=off -c work_mem=16MB'
-    healthcheck:
-      test: ['CMD-SHELL', "sh -c 'pg_isready -U rinha_user -d rinha_db'"]
-      interval: 5s
-      timeout: 5s
-      retries: 20
-      start_period: 10s
-    deploy:
-      resources:
-        limits:
-          cpus: '0.75'
-          memory: '230MB'
-# dev
 # version: '3.9'
 
 # services:
@@ -93,8 +8,9 @@ services:
 #     depends_on:
 #       - api1
 #       - api2
-#     ports:
-#       - '9999:9999'
+#     expose:
+#       - 9999
+#     network_mode: host
 #     restart: always
 #     deploy:
 #       resources:
@@ -109,11 +25,13 @@ services:
 #     hostname: api1
 #     restart: always
 #     environment:
-#       DB_HOST: postgres
+#       DB_HOST: localhost
 #       DB_PASSWORD: rinha_pass
 #       DB_USER: rinha_user
 #       DB_NAME: rinha_db
 #       DB_PORT: 5432
+#       HTTP_PORT: 8080
+#     network_mode: host
 #     volumes:
 #       - ./sql/init.sql:/docker-entrypoint-initdb.d/init.sql
 #     deploy:
@@ -124,14 +42,21 @@ services:
 #     depends_on:
 #       postgres:
 #         condition: service_healthy
-#     ports:
-#       - '8080:8080'
+#     expose:
+#       - 8080
 
 #   api2:
 #     <<: *api
 #     hostname: api2
-#     ports:
-#       - '8081:8080'
+#     environment:
+#       DB_HOST: localhost
+#       DB_PASSWORD: rinha_pass
+#       DB_USER: rinha_user
+#       DB_NAME: rinha_db
+#       DB_PORT: 5432
+#       HTTP_PORT: 8081
+#     expose:
+#       - 8081
 
 #   postgres:
 #     image: postgres:alpine
@@ -140,8 +65,9 @@ services:
 #       POSTGRES_PASSWORD: rinha_pass
 #       POSTGRES_USER: rinha_user
 #       POSTGRES_DB: rinha_db
-#     ports:
-#       - '5432:5432'
+#     network_mode: host
+#     expose:
+#       - 5432
 #     volumes:
 #       - ./sql/init.sql:/docker-entrypoint-initdb.d/init.sql
 #     command: 'postgres -c shared_buffers=96MB -c checkpoint_timeout=600 -c synchronous_commit=off -c fsync=off -c full_page_writes=off -c work_mem=16MB'
@@ -156,8 +82,82 @@ services:
 #         limits:
 #           cpus: '0.75'
 #           memory: '230MB'
+# dev
+version: '3.9'
 
-# networks:
-#   default:
-#     driver: bridge
-#     name: rinha-nginx-2024q1
+services:
+  nginx:
+    image: nginx:alpine
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - api1
+      - api2
+    ports:
+      - '9999:9999'
+    restart: always
+    # deploy:
+    #   resources:
+    #     limits:
+    #       cpus: '0.4'
+    #       memory: '80MB'
+
+  api1: &api
+    build:
+      context: .
+      dockerfile: Dockerfile
+    hostname: api1
+    restart: always
+    environment:
+      DB_HOST: postgres
+      DB_PASSWORD: rinha_pass
+      DB_USER: rinha_user
+      DB_NAME: rinha_db
+      DB_PORT: 5432
+    volumes:
+      - ./sql/init.sql:/docker-entrypoint-initdb.d/init.sql
+    # deploy:
+    #   resources:
+    #     limits:
+    #       cpus: '0.4'
+    #       memory: '140MB'
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - '8080:8080'
+
+  api2:
+    <<: *api
+    hostname: api2
+    ports:
+      - '8081:8080'
+
+  postgres:
+    image: postgres:alpine
+    hostname: postgres
+    environment:
+      POSTGRES_PASSWORD: rinha_pass
+      POSTGRES_USER: rinha_user
+      POSTGRES_DB: rinha_db
+    ports:
+      - '5432:5432'
+    volumes:
+      - ./sql/init.sql:/docker-entrypoint-initdb.d/init.sql
+    command: 'postgres -c shared_buffers=96MB -c checkpoint_timeout=600 -c synchronous_commit=off -c fsync=off -c full_page_writes=off -c work_mem=16MB'
+    healthcheck:
+      test: ['CMD-SHELL', "sh -c 'pg_isready -U rinha_user -d rinha_db'"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+    # deploy:
+    #   resources:
+    #     limits:
+    #       cpus: '0.75'
+    #       memory: '230MB'
+
+networks:
+  default:
+    driver: bridge
+    name: rinha-nginx-2024q1
