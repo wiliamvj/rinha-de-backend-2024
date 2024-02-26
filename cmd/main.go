@@ -46,7 +46,7 @@ func main() {
 
 	// set db configuration
 	pgxConfig := conn.Config()
-	pgxConfig.MaxConns = 9
+	pgxConfig.MaxConns = 7
 
 	// set global db
 	db = conn

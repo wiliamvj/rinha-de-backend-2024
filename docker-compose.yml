@@ -16,7 +16,7 @@
        resources:
          limits:
            cpus: '0.1'
-           memory: '60MB'
+           memory: '30MB' 
 
    api1: &api
      build:
@@ -37,8 +37,8 @@
      deploy:
        resources:
          limits:
-           cpus: '0.25'
-           memory: '60MB'
+           cpus: '0.1'
+           memory: '80MB'
      depends_on:
        postgres:
          condition: service_healthy
@@ -80,5 +80,5 @@
      deploy:
        resources:
          limits:
-           cpus: '0.9'
-           memory: '370MB'
+           cpus: '1.2'
+           memory: '360MB'
