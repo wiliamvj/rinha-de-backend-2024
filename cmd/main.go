@@ -23,11 +23,6 @@ func main() {
 	dbPassword := os.Getenv("DB_PASSWORD")
 	dbName := os.Getenv("DB_NAME")
 
-	// dbHost := "localhost"
-	// dbUser := "rinha_user"
-	// dbPassword := "rinha_pass"
-	// dbName := "rinha_db"
-
 	connectionurl := fmt.Sprintf("host=%s user=%s password=%s dbname=%s sslmode=disable", dbHost, dbUser, dbPassword, dbName)
 
 	pgxconn, err := pgxpool.ParseConfig(connectionurl)
@@ -46,7 +41,7 @@ func main() {
 
 	// set db configuration
 	pgxConfig := conn.Config()
-	pgxConfig.MaxConns = 10
+	pgxConfig.MaxConns = 8
 
 	// set global db
 	db = conn
