@@ -33,6 +33,10 @@ INSERT INTO client (id, balance, u_limit) VALUES (3, 0, 1000000);
 INSERT INTO client (id, balance, u_limit) VALUES (4, 0, 10000000);
 INSERT INTO client (id, balance, u_limit) VALUES (5, 0, 500000);
 
+CREATE EXTENSION IF NOT EXISTS pg_prewarm;
+SELECT pg_prewarm('client');
+SELECT pg_prewarm('bank_transaction');
+
 DROP TYPE IF EXISTS create_transaction_result;
 CREATE TYPE create_transaction_result AS ( balance integer, u_limit integer );
 
