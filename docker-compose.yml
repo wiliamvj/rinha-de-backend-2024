@@ -19,9 +19,7 @@ services:
           memory: '30MB'
 
   api1: &api
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: wiliamvj/rinha:latest
     hostname: api1
     restart: always
     environment:
